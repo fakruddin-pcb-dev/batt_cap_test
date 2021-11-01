@@ -12,12 +12,12 @@
 #define Buzzer_Pin 9
 U8GLIB_SH1106_128X64 u8g(U8G_I2C_OPT_NONE);  // I2C / TWI  
 float Capacity = 0.0; // Capacity in mAh
-float Res_Value = 1.1;  // Resistor Value in Ohm
+float Res_Value = 1.0;  // Resistor Value in Ohm
 float Vcc = 4.64; // Voltage of Arduino 5V pin ( Mesured by Multimeter )
 float Current = 0.0; // Current in Amp
 float mA=0;         // Current in mA
 float Bat_Volt = 0.0;  // Battery Voltage 
-float Res_Volt = 0.0;  // Voltage at lower end of the Resistor 
+float Res_Volt = 0.0;  // Voltage at higher end of the Resistor 
 float Bat_High = 4.3; // Battery High Voltage
 float Bat_Low = 2.5; // Discharge Cut Off Voltage
 unsigned long previousMillis = 0; // Previous time in ms
@@ -131,15 +131,15 @@ void draw(void) {
   else if(Bat_Volt > Bat_Low && Bat_Volt < Bat_High  ) { // Check if the battery voltage is within the safe limit
       digitalWrite(MOSFET_Pin, HIGH);
       millisPassed = millis() - previousMillis;
-      Current = (Bat_Volt - Res_Volt) / Res_Value;
+      Current = (Res_Volt) / Res_Value;
       mA = Current * 1000.0 ;
       Capacity = Capacity + mA * (millisPassed / 3600000.0); // 1 Hour = 3600000ms
       previousMillis = millis();
-      Serial.print("BATT_VOLT:"); Serial.println(Bat_Volt); Serial.print("CAPACITY:"); Serial.println(Capacity);
+      Serial.print("BATT_VOLT:"); Serial.println(Bat_Volt); Serial.print("RES_VOLT:");Serial.println(Res_Volt);Serial.print("CAPACITY:"); Serial.println(Capacity);
       row++;
       x++;
       //testcode
-       if(Current<=CRVAL && PWM_Value <150)
+       if(Current<=CRVAL && PWM_Value <250)
       {
         if(Current+0.2<CRVAL)
         {
@@ -170,6 +170,11 @@ void draw(void) {
       Serial.println(PWM_Value*100/256);
       Serial.println("");
       delay(500); 
+     }
+     if(Bat_Volt < Bat_Low)
+     {
+      PWM_Value=0;
+      analogWrite(PWM_Pin,PWM_Value);
      }
   //*************************************************
   
