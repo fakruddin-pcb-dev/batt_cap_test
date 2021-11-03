@@ -2,7 +2,7 @@
 battery capacitiy tester with constant current 
 
 # Variant
-pcb->this is for a diffrent position of resistor 
+pcb->this is for a different position of resistor 
 
 # Dependencies
 U8glib.h
