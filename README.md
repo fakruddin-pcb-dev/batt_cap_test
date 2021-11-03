@@ -1,8 +1,8 @@
 # batt_cap_test
 battery capacitiy tester with constant current 
 
-#variant
+# Variant
 pcb->this is for a diffrent position of resistor 
 
-# dependencies
+# Dependencies
 U8glib.h
