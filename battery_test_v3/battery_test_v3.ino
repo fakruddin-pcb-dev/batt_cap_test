@@ -16,35 +16,24 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 //#define MOSFET_Pin 2
-#define Bat_Pin_1 A0
-#define Res_Pin_1 A1
-#define Bat_Pin_2 A2
-#define Res_Pin_2 A3
-#define Bat_Pin_3 A6
-#define Res_Pin_3 A7
-#define Buzzer_Pin 9
+#define Bat_Pin_1 A7
+#define Res_Pin_1 A6
+#define PWM_Pin_1 10
+#define Bat_Pin_2 A0
+#define Res_Pin_2 A1
+#define PWM_Pin_2 3
+#define Bat_Pin_3 A0
+#define Res_Pin_3 A1
+#define PWM_Pin_3 5
 #define PWMOFF 0
 #define PWMMAX 255
-//U8GLIB_SH1106_128X64 u8g(U8G_I2C_OPT_NONE); // I2C / TWI
-//float Capacity = 0.0;                       // Capacity in mAh
 float Res_Value = 1.0; // Resistor Value in Ohm
 float Vcc = 4.64;      // Voltage of Arduino 5V pin ( Mesured by Multimeter )
-//float Current = 0.0;                        // Current in Amp
-//float mA = 0;                               // Current in mA
-//float Bat_Volt = 0.0;                       // Battery Voltage
-//float Res_Volt = 0.0;                       // Voltage at higher end of the Resistor
-float Bat_High = 4.3;             // Battery High Voltage
-float Bat_Low = 2.5;              // Discharge Cut Off Voltage
-unsigned long previousMillis = 0; // Previous time in ms
-unsigned long millisPassed = 0;   // Current time in ms
+float Bat_High = 4.3;  // Battery High Voltage
+float Bat_Low = 2.5;   // Discharge Cut Off Voltage
 float sample1 = 0;
-//float sample2 = 0;
 int x = 0;
 int row = 0;
-//const int Current [] = {0,110,210,300,390,490,580,680,770,870,960,1000};
-//const byte PWM_Pin = 10;
-//int PWM_Value = 0;
-//float CRVAL = 1;
 
 //**********************CELL CLASS ********************//
 class Cell
@@ -60,7 +49,8 @@ private:
   float BattVolt;
   float ResVolt;
   uint8_t CellTagNumber;
-
+  unsigned long previousMillis; // Previous time in ms
+  unsigned long millisPassed;   // Current time in ms
 public:
   uint8_t PWMvalue;
   static uint8_t NUMBER_OF_CELL;
@@ -77,6 +67,8 @@ public:
     BattVolt = 0;
     ResVolt = 0;
     CellTagNumber = CellNumber;
+    unsigned long previousMillis = 0; // Previous time in ms
+    unsigned long millisPassed = 0;   // Current time in ms
   }
   ~Cell() {}
 
@@ -106,7 +98,7 @@ public:
   }
   uint8_t getPWMpercent()
   {
-    return (this->PWMvalue * 100 / 255);
+    return (PWMvalue * 100 / 255);
   }
   void setBattVolt(float volt)
   {
@@ -150,52 +142,6 @@ public:
   {
     return CellTagNumber;
   }
-  void updateCapacity()
-  {
-    Current = ResVolt / Res_Value;
-    mA = Current * 1000.0;
-    Capacity = Capacity + mA * (millisPassed / 3600000.0); // 1 Hour = 3600000ms
-  }
-  void updatePWM()
-  {
-    if (Current <= CurrentLimit && PWMvalue < PWMMAX)
-    {
-      if (Current + 0.2 < CurrentLimit)
-      {
-        PWMvalue = PWMvalue + 10;
-      }
-      else
-      {
-        PWMvalue = PWMvalue + 1;
-      }
-    }
-    if (Current > CurrentLimit)
-    {
-      if (Current > CurrentLimit + 0.2)
-      {
-        PWMvalue -= 5;
-      }
-      else
-      {
-        PWMvalue -= 1;
-      }
-    }
-    analogWrite(PWMPin, PWMvalue);
-  }
-  void printinfoSerial()
-  {
-    Serial.print("BATT_VOLT(V):");
-    Serial.println(BattVolt);
-    Serial.print("RES_VOLT(V):");
-    Serial.println(ResVolt);
-    Serial.print("CAPACITY(mAh):");
-    Serial.println(Capacity);
-    Serial.print("Current(A):");
-    Serial.println(Current);
-    Serial.print("PWM(%):");
-    Serial.println(PWMvalue * 100 / 256);
-    Serial.println("");
-  }
   void setPWMZeroCuttOff()
   {
     if (BattVolt < Bat_Low)
@@ -206,10 +152,68 @@ public:
   }
   void handler()
   {
-    if (BattVolt > Bat_High && BattVolt < Bat_Low)
+    if (BattVolt > Bat_High)
     {
-      updateCapacity();
-      updatePWM();
+      analogWrite(PWMPin, PWMOFF); // Turned Off the MOSFET // No discharge
+      //beep(200);
+      Serial.println("Warning High-V! Cell" + String(getCellTagNumber()));
+      delay(300);
+    }
+    else if (BattVolt < Bat_Low)
+    {
+      analogWrite(PWMPin, PWMOFF); // Turned Off the MOSFET // No discharge
+      //beep(200);
+      Serial.println("Warning Low-V! Cell" + String(getCellTagNumber()));
+      delay(300);
+    }
+    else if (BattVolt > Bat_Low && BattVolt < Bat_High)
+    {
+      millisPassed = millis() - previousMillis;
+      Current = ResVolt / Res_Value;
+      mA = Current * 1000.0;
+      Capacity = Capacity + mA * (millisPassed / 3600000.0); // 1 Hour = 3600000ms
+      previousMillis = millis();
+      Serial.print("Cell :");
+      Serial.print(getCellTagNumber());
+      Serial.print("BATT_VOLT(V):");
+      Serial.println(BattVolt);
+      Serial.print("RES_VOLT(V):");
+      Serial.println(ResVolt);
+      Serial.print("CAPACITY(mAh):");
+      Serial.println(Capacity);
+      row++;
+      x++;
+      //testcode
+      if (Current <= CurrentLimit && PWMvalue < 255)
+      {
+        if (Current + 0.2 < CurrentLimit)
+        {
+          PWMvalue += 10;
+        }
+        else
+        {
+          PWMvalue += 1;
+        }
+      }
+      if (Current > CurrentLimit)
+      {
+        if (Current > CurrentLimit + 0.2)
+        {
+          PWMvalue -= 5;
+        }
+        else
+        {
+          PWMvalue -= 1;
+        }
+      }
+      analogWrite(PWMPin, PWMvalue);
+      Serial.print("Current(A):");
+      Serial.println(Current);
+      Serial.print("PWM:");
+      Serial.print("Value(%):");
+      Serial.println(PWMvalue * 100 / 256);
+      Serial.println("");
+      delay(500);
     }
   }
   void drawhandle()
@@ -217,7 +221,7 @@ public:
     display.clearDisplay();
     display.setTextSize(2);
     display.setCursor(25, 40);
-    display.println("CELL:"+String(CellTagNumber));
+    display.println("CELL:" + String(CellTagNumber));
     if (BattVolt < 1)
     {
       display.clearDisplay();
@@ -245,75 +249,28 @@ public:
       display.setTextSize(1);
       display.setCursor(0, 20); // set position
       display.println("Volt: " + String(BattVolt) + "V");
-      display.setCursor(0,40);
-      display.println("Curr: " + String(Current)+ "mA" );
-      display.setCursor(0,40);
+      display.setCursor(0, 40);
+      display.println("Curr: " + String(Current) + "mA");
+      display.setCursor(0, 40);
       display.println("mAh: " + String(Capacity));
-      // u8g.drawStr(0, 20, "Volt: "); // put string of display at position X, Y
-      // u8g.drawStr(0, 40, "Curr: ");
-      // u8g.drawStr(0, 60, "mAh: ");
-      // u8g.setPrintPos(58, 20); // set position
-      // u8g.print(BattVolt, 2);  // display Battery Voltage in Volt
-      // u8g.println("V");
-      // u8g.setPrintPos(58, 40); // set position
-      // u8g.print(mA, 0);        // display current in mA
-      // u8g.println("mA");
-      // u8g.setPrintPos(58, 60); // set position
-      // u8g.print(Capacity, 1);  // display capacity in mAh
     }
   }
 };
 
-//************************ OLED Display Draw Function *******************************************************
-// void draw(void)
-// {
-// u8g.setFont(u8g_font_fub14r); // select font
-// if (Bat_Volt < 1)
-// {
-//   u8g.setPrintPos(10, 40); // set position
-//   u8g.println("No Battery!");
-// }
-// else if (Bat_Volt > Bat_High)
-// {
-//   u8g.setPrintPos(25, 40); // set position
-//   u8g.println("High-V!");
-// }
-// else if (Bat_Volt < Bat_Low)
-// {
-//   u8g.setPrintPos(25, 40); // set position
-//   u8g.println("Low-V!");
-// }
-// else if (Bat_Volt >= Bat_Low && Bat_Volt < Bat_High)
-// {
-
-//   u8g.drawStr(0, 20, "Volt: "); // put string of display at position X, Y
-//   u8g.drawStr(0, 40, "Curr: ");
-//   u8g.drawStr(0, 60, "mAh: ");
-//   u8g.setPrintPos(58, 20); // set position
-//   u8g.print(Bat_Volt, 2);  // display Battery Voltage in Volt
-//   u8g.println("V");
-//   u8g.setPrintPos(58, 40); // set position
-//   u8g.print(mA, 0);        // display current in mA
-//   u8g.println("mA");
-//   u8g.setPrintPos(58, 60); // set position
-//   u8g.print(Capacity, 1);  // display capacity in mAh
-// }
-
-// }
 //******************************Buzzer Beep Function *********************************************************
-void beep(unsigned char delay_time)
-{
-  analogWrite(9, 20);         // PWM signal to generate beep tone
-  delay(delay_time);          // wait for a delayms ms
-  analogWrite(Buzzer_Pin, 0); // 0 turns it off
-  delay(delay_time);          // wait for a delayms ms
-}
+// void beep(unsigned char delay_time)
+// {
+//   analogWrite(9, 20);         // PWM signal to generate beep tone
+//   delay(delay_time);          // wait for a delayms ms
+//   analogWrite(Buzzer_Pin, 0); // 0 turns it off
+//   delay(delay_time);          // wait for a delayms ms
+// }
 
 //*******************************Setup Function ***************************************************************
 uint8_t Cell::NUMBER_OF_CELL = 0;
-Cell CELL_1(A0, A1, 10, 1, 1);
-Cell CELL_2(A2, A3, 9, 1, 2);
-Cell CELL_3(A6, A7, 11, 1, 3);
+Cell CELL_1(Bat_Pin_1, Res_Pin_1, PWM_Pin_1, 1, 1);
+Cell CELL_2(Bat_Pin_2, Res_Pin_2, PWM_Pin_2, 1, 2);
+Cell CELL_3(Bat_Pin_3, Res_Pin_3, PWM_Pin_3, 1, 3);
 void setup()
 {
   Serial.begin(9600);
@@ -325,11 +282,6 @@ void setup()
   pinMode(CELL_1.getPWMPin(), OUTPUT);
   pinMode(CELL_2.getPWMPin(), OUTPUT);
   pinMode(CELL_3.getPWMPin(), OUTPUT);
-  digitalWrite(CELL_1.getPWMPin(),LOW);
-  digitalWrite(CELL_2.getPWMPin(),LOW);
-  digitalWrite(CELL_3.getPWMPin(),LOW);
-  //Serial.println("Arduino Battery Capacity Tester v1.0");
-  //Serial.println("BattVolt Current mAh");
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.clearDisplay();
   display.setTextColor(WHITE);
@@ -346,94 +298,25 @@ void loop()
   // Voltage devider Out = Bat_Volt * R2/(R1+R2 ) // R1 =10K and R2 =10K
 
   //************ Measuring Battery Voltage ***********
-
-  // for (int i = 0; i < 100; i++)
-  // {
-  //   sample1 = sample1 + analogRead(CELL_1.getBattPin()); //read the voltage from the divider circuit
-  //   delay(2);
-  // }
-  // sample1 = sample1 / 100;
-  // CELL_1.setBattVolt(sample1 * 2 * Vcc / 1024.0);
   CELL_1.MeasureBattVolt();
   CELL_2.MeasureBattVolt();
   CELL_3.MeasureBattVolt();
 
   // *********  Measuring Resistor Voltage ***********
-
-  // for (int i = 0; i < 100; i++)
-  // {
-  //   sample2 = sample2 + analogRead(Res_Pin_1); //read the voltage from the divider circuit
-  //   delay(2);
-  // }
-  // sample2 = sample2 / 100;
-  // Res_Volt = sample2 * 2 * Vcc / 1024.0;
   CELL_1.MeasureResVolt();
   CELL_2.MeasureResVolt();
   CELL_3.MeasureResVolt();
   //********************* Checking the different conditions *************
 
-  if (CELL_1.getBattVolt() > Bat_High || CELL_2.getBattVolt() > Bat_High || CELL_2.getBattVolt() > Bat_High)
-  {
-    if (CELL_1.getBattVolt() > Bat_High)
-    {
-      analogWrite(CELL_1.getPWMPin(), PWMOFF); // Turned Off the MOSFET // No discharge
-    }
-    else if (CELL_2.getBattVolt() > Bat_High)
-    {
-      analogWrite(CELL_2.getPWMPin(), PWMOFF); // Turned Off the MOSFET // No discharge
-    }
-    else if (CELL_3.getBattVolt() > Bat_High)
-    {
-      analogWrite(CELL_3.getPWMPin(), PWMOFF); // Turned Off the MOSFET // No discharge
-    }
-    Serial.println("Warning High-V! ");
-    delay(1000);
-  }
-  else if (CELL_1.getBattVolt() < Bat_Low || CELL_2.getBattVolt() < Bat_Low || CELL_2.getBattVolt() < Bat_Low)
-  {
-    if (CELL_1.getBattVolt() < Bat_Low)
-    {
-      analogWrite(CELL_1.getPWMPin(), PWMOFF); // Turned Off the MOSFET // No discharge
-    }
-    else if (CELL_2.getBattVolt() < Bat_Low)
-    {
-      analogWrite(CELL_2.getPWMPin(), PWMOFF); // Turned Off the MOSFET // No discharge
-    }
-    else if (CELL_3.getBattVolt() < Bat_Low)
-    {
-      analogWrite(CELL_3.getPWMPin(), PWMOFF); // Turned Off the MOSFET // No discharge
-    }
-    Serial.println("Warning Low-V! ");
-    delay(1000);
-  }
-  else if ((CELL_1.getBattVolt() > Bat_Low && CELL_1.getBattVolt() < Bat_High) || (CELL_3.getBattVolt() > Bat_Low && CELL_3.getBattVolt() < Bat_High) || (CELL_2.getBattVolt() > Bat_Low && CELL_2.getBattVolt() < Bat_High))
-  { // Check if the battery voltage is within the safe limit
-    //digitalWrite(MOSFET_Pin, HIGH);
-    millisPassed = millis() - previousMillis;
-    // mA = Current * 1000.0;
-    // Capacity = Capacity + mA * (millisPassed / 3600000.0); // 1 Hour = 3600000ms
-    CELL_1.handler();
-    CELL_2.handler();
-    CELL_3.handler();
-    previousMillis = millis();
-    CELL_1.printinfoSerial();
-    CELL_2.printinfoSerial();
-    CELL_3.printinfoSerial();
-    row++;
-    x++;
-    delay(500);
-  }
+  CELL_1.handler();
+  CELL_2.handler();
+  CELL_3.handler();
   CELL_1.setPWMZeroCuttOff();
   CELL_2.setPWMZeroCuttOff();
   CELL_3.setPWMZeroCuttOff();
   //*************************************************
 
   //**************************************************
-  // u8g.firstPage();
-  // do
-  // {
-  //   CELL_1.drawhandle();
-  // } while (u8g.nextPage());
   CELL_1.drawhandle();
   CELL_2.drawhandle();
   CELL_3.drawhandle();
