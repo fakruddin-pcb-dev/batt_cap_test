@@ -1,8 +1,8 @@
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 // ARDUINO BATTERY CAPACITY TESTER
 //Version-1.0
-//by deba168,INDIA
 //Dated : 04/09/2016
+//All PINS are now configured
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 #include <Arduino.h>
@@ -21,10 +21,10 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define PWM_Pin_1 10
 #define Bat_Pin_2 A0
 #define Res_Pin_2 A1
-#define PWM_Pin_2 3
-#define Bat_Pin_3 A0
-#define Res_Pin_3 A1
-#define PWM_Pin_3 5
+#define PWM_Pin_2 6
+#define Bat_Pin_3 A2
+#define Res_Pin_3 A3
+#define PWM_Pin_3 3
 #define PWMOFF 0
 #define PWMMAX 255
 float Res_Value = 1.0; // Resistor Value in Ohm
@@ -126,6 +126,10 @@ public:
     }
     sample1 = sample1 / 100;
     BattVolt = sample1 * 2 * Vcc / 1024.0;
+    Serial.print("Battery_Volt ");
+    Serial.print(CellTagNumber);
+    Serial.print(":");
+    Serial.println(BattVolt);
   }
   void MeasureResVolt()
   {
@@ -148,6 +152,10 @@ public:
     {
       PWMvalue = 0;
       analogWrite(PWMPin, PWMvalue);
+      Serial.print("Cell :");
+      Serial.print(getCellTagNumber());
+      Serial.print(" ");
+      Serial.println("Cuttoff");
     }
   }
   void handler()
@@ -173,14 +181,6 @@ public:
       mA = Current * 1000.0;
       Capacity = Capacity + mA * (millisPassed / 3600000.0); // 1 Hour = 3600000ms
       previousMillis = millis();
-      Serial.print("Cell :");
-      Serial.print(getCellTagNumber());
-      Serial.print("BATT_VOLT(V):");
-      Serial.println(BattVolt);
-      Serial.print("RES_VOLT(V):");
-      Serial.println(ResVolt);
-      Serial.print("CAPACITY(mAh):");
-      Serial.println(Capacity);
       row++;
       x++;
       //testcode
@@ -255,6 +255,28 @@ public:
       display.println("mAh: " + String(Capacity));
     }
   }
+  void setPWM(uint8_t value)
+  {
+    analogWrite(PWMPin, value);
+    Serial.print("PWM ");
+    Serial.print(CellTagNumber);
+    Serial.print(":");
+    Serial.print(value);
+    Serial.print("  ");
+    Serial.print("Res_volt");
+    Serial.println(ResVolt);
+  }
+  void printinfo()
+  {
+    Serial.print("Cell :");
+    Serial.println(getCellTagNumber());
+    Serial.print("BATT_VOLT(V):");
+    Serial.println(BattVolt);
+    Serial.print("RES_VOLT(V):");
+    Serial.println(ResVolt);
+    Serial.print("CAPACITY(mAh):");
+    Serial.println(Capacity);
+  }
 };
 
 //******************************Buzzer Beep Function *********************************************************
@@ -307,18 +329,21 @@ void loop()
   CELL_2.MeasureResVolt();
   CELL_3.MeasureResVolt();
   //********************* Checking the different conditions *************
-
   CELL_1.handler();
   CELL_2.handler();
   CELL_3.handler();
   CELL_1.setPWMZeroCuttOff();
   CELL_2.setPWMZeroCuttOff();
   CELL_3.setPWMZeroCuttOff();
+  CELL_1.printinfo();
+  CELL_2.printinfo();
+  CELL_3.printinfo();
+  delay(500);
   //*************************************************
 
   //**************************************************
-  CELL_1.drawhandle();
-  CELL_2.drawhandle();
-  CELL_3.drawhandle();
+  //CELL_1.drawhandle();
+  //CELL_2.drawhandle();
+  //CELL_3.drawhandle();
   //*************************************************
 }
