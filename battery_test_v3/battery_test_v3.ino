@@ -1,7 +1,8 @@
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 // ARDUINO BATTERY CAPACITY TESTER
-//Version-1.0
-//Dated : 04/09/2016
+//Version-3.1
+//Auth:Fakruddin
+//Dated : 14/11/2021
 //All PINS are now configured
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
@@ -34,7 +35,8 @@ float Bat_Low = 2.5;   // Discharge Cut Off Voltage
 float sample1 = 0;
 int x = 0;
 int row = 0;
-
+unsigned long previousMillisprint = 0; // Previous time in ms
+unsigned long millisPassedprint = 0;   // Current time in ms
 //**********************CELL CLASS ********************//
 class Cell
 {
@@ -126,10 +128,6 @@ public:
     }
     sample1 = sample1 / 100;
     BattVolt = sample1 * 2 * Vcc / 1024.0;
-    Serial.print("Battery_Volt ");
-    Serial.print(CellTagNumber);
-    Serial.print(":");
-    Serial.println(BattVolt);
   }
   void MeasureResVolt()
   {
@@ -148,31 +146,32 @@ public:
   }
   void setPWMZeroCuttOff()
   {
-    if (BattVolt < Bat_Low)
+    if (BattVolt < Bat_Low && BattVolt > 1)
     {
-      PWMvalue = 0;
+      PWMvalue = PWMOFF;
       analogWrite(PWMPin, PWMvalue);
-      Serial.print("Cell :");
-      Serial.print(getCellTagNumber());
-      Serial.print(" ");
-      Serial.println("Cuttoff");
     }
+  }
+  void resetvalues()
+  {
+    PWMvalue = 0;
+    Capacity = 0;
+    Current = 0;
+    mA = 0;
+    BattVolt = 0;
+    ResVolt = 0;
   }
   void handler()
   {
     if (BattVolt > Bat_High)
     {
       analogWrite(PWMPin, PWMOFF); // Turned Off the MOSFET // No discharge
-      //beep(200);
-      Serial.println("Warning High-V! Cell" + String(getCellTagNumber()));
-      delay(300);
+      resetvalues();
     }
-    else if (BattVolt < Bat_Low)
+    else if (BattVolt < 1)
     {
       analogWrite(PWMPin, PWMOFF); // Turned Off the MOSFET // No discharge
-      //beep(200);
-      Serial.println("Warning Low-V! Cell" + String(getCellTagNumber()));
-      delay(300);
+      resetvalues();
     }
     else if (BattVolt > Bat_Low && BattVolt < Bat_High)
     {
@@ -207,13 +206,7 @@ public:
         }
       }
       analogWrite(PWMPin, PWMvalue);
-      Serial.print("Current(A):");
-      Serial.println(Current);
-      Serial.print("PWM:");
-      Serial.print("Value(%):");
-      Serial.println(PWMvalue * 100 / 256);
-      Serial.println("");
-      delay(500);
+      //   delay(500);
     }
   }
   void drawhandle()
@@ -255,27 +248,44 @@ public:
       display.println("mAh: " + String(Capacity));
     }
   }
-  void setPWM(uint8_t value)
-  {
-    analogWrite(PWMPin, value);
-    Serial.print("PWM ");
-    Serial.print(CellTagNumber);
-    Serial.print(":");
-    Serial.print(value);
-    Serial.print("  ");
-    Serial.print("Res_volt");
-    Serial.println(ResVolt);
-  }
   void printinfo()
   {
-    Serial.print("Cell :");
-    Serial.println(getCellTagNumber());
-    Serial.print("BATT_VOLT(V):");
-    Serial.println(BattVolt);
-    Serial.print("RES_VOLT(V):");
-    Serial.println(ResVolt);
-    Serial.print("CAPACITY(mAh):");
-    Serial.println(Capacity);
+    if (BattVolt > Bat_High)
+    {
+      Serial.print("Warning High-V! Cell");
+      Serial.println(getCellTagNumber());
+    }
+    else if (BattVolt > 1)
+    {
+      if (BattVolt < Bat_Low && BattVolt > 1)
+      {
+        Serial.print("Cell :");
+        Serial.print(getCellTagNumber());
+        Serial.print(" ");
+        Serial.println("Cuttoff");
+      }
+      Serial.print("Cell :");
+      Serial.println(getCellTagNumber());
+      Serial.print("BATT_VOLT(V):");
+      Serial.println(BattVolt);
+      Serial.print("RES_VOLT(V):");
+      Serial.println(ResVolt);
+      Serial.print("CAPACITY(mAh):");
+      Serial.println(Capacity);
+      Serial.print("Current(A):");
+      Serial.println(Current);
+      Serial.print("PWM:");
+      Serial.print("Value(%):");
+      Serial.println(PWMvalue * 100 / 256);
+      Serial.println("");
+    }
+    else if (BattVolt < 1)
+    {
+      Serial.print("No Cell! Slot");
+      Serial.println(getCellTagNumber());
+      Serial.print("Reseting values Slot");
+      Serial.println(getCellTagNumber());
+    }
   }
 };
 
@@ -335,10 +345,15 @@ void loop()
   CELL_1.setPWMZeroCuttOff();
   CELL_2.setPWMZeroCuttOff();
   CELL_3.setPWMZeroCuttOff();
-  CELL_1.printinfo();
-  CELL_2.printinfo();
-  CELL_3.printinfo();
-  delay(500);
+  millisPassedprint = millis();
+  if (millisPassedprint - previousMillisprint > 2000)
+  {
+    previousMillisprint = millis();
+    CELL_1.printinfo();
+    CELL_2.printinfo();
+    CELL_3.printinfo();
+  }
+
   //*************************************************
 
   //**************************************************
